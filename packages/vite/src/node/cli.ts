@@ -1,8 +1,9 @@
 import { cac } from 'cac'
 import chalk from 'chalk'
+import { performance } from 'perf_hooks'
 import { BuildOptions } from './build'
 import { ServerOptions } from './server'
-import { createLogger, LogLevel } from './logger'
+import { createLogger, LogLevel, printHttpServerUrls } from './logger'
 import { resolveConfig } from '.'
 import { preview } from './preview'
 
@@ -90,7 +91,31 @@ cli
         clearScreen: options.clearScreen,
         server: cleanOptions(options)
       })
+
+      const info = server.config.logger.info
+
+      info(
+        chalk.cyan(`\n  vite v${require('vite/package.json').version}`) +
+          chalk.green(` dev server running at:\n`),
+        {
+          clear: !server.config.logger.hasWarned
+        }
+      )
+
+      if (!server.httpServer) {
+        throw new Error('HTTP server not available')
+      }
+
       await server.listen()
+
+      printHttpServerUrls(server.httpServer, server.config, options)
+
+      // @ts-ignore
+      if (global.__vite_start_time) {
+        // @ts-ignore
+        const startupDuration = performance.now() - global.__vite_start_time
+        info(`\n  ${chalk.cyan(`ready in ${Math.ceil(startupDuration)}ms.`)}\n`)
+      }
     } catch (e) {
       createLogger(options.logLevel).error(
         chalk.red(`error when starting dev server:\n${e.stack}`),
@@ -222,7 +247,9 @@ cli
           'serve',
           'production'
         )
-        await preview(config, cleanOptions(options))
+        const server = await preview(config, cleanOptions(options))
+
+        printHttpServerUrls(server, config, options)
       } catch (e) {
         createLogger(options.logLevel).error(
           chalk.red(`error when starting preview server:\n${e.stack}`),

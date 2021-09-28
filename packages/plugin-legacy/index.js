@@ -79,7 +79,7 @@ function viteLegacyPlugin(options = {}) {
    * @type {import('vite').Plugin}
    */
   const legacyConfigPlugin = {
-    name: 'legacy-config',
+    name: 'vite:legacy-config',
 
     apply: 'build',
     config(config) {
@@ -93,11 +93,11 @@ function viteLegacyPlugin(options = {}) {
    * @type {import('vite').Plugin}
    */
   const legacyGenerateBundlePlugin = {
-    name: 'legacy-generate-polyfill-chunk',
+    name: 'vite:legacy-generate-polyfill-chunk',
     apply: 'build',
 
     configResolved(config) {
-      if (!config.build.ssr && config.build.minify === 'esbuild') {
+      if (!config.build.ssr && genLegacy && config.build.minify === 'esbuild') {
         throw new Error(
           `Can't use esbuild as the minifier when targeting legacy browsers ` +
             `because esbuild minification is not legacy safe.`
@@ -124,7 +124,8 @@ function viteLegacyPlugin(options = {}) {
           modernPolyfills,
           bundle,
           facadeToModernPolyfillMap,
-          config.build
+          config.build,
+          options.externalSystemJS,
         )
         return
       }
@@ -154,7 +155,8 @@ function viteLegacyPlugin(options = {}) {
           facadeToLegacyPolyfillMap,
           // force using terser for legacy polyfill minification, since esbuild
           // isn't legacy-safe
-          config.build
+          config.build,
+          options.externalSystemJS,
         )
       }
     }
@@ -164,7 +166,7 @@ function viteLegacyPlugin(options = {}) {
    * @type {import('vite').Plugin}
    */
   const legacyPostPlugin = {
-    name: 'legacy-post-process',
+    name: 'vite:legacy-post-process',
     enforce: 'post',
     apply: 'build',
 
@@ -181,7 +183,7 @@ function viteLegacyPlugin(options = {}) {
       /**
        * @param {string | ((chunkInfo: import('rollup').PreRenderedChunk) => string)} fileNames
        * @param {string?} defaultFileName
-       * @returns {(chunkInfo: import('rollup').PreRenderedChunk) => string)}
+       * @returns {string | ((chunkInfo: import('rollup').PreRenderedChunk) => string)}
        */
       const getLegacyOutputFileName = (
         fileNames,
@@ -449,7 +451,7 @@ function viteLegacyPlugin(options = {}) {
    * @type {import('vite').Plugin}
    */
   const legacyEnvPlugin = {
-    name: 'legacy-env',
+    name: 'vite:legacy-env',
 
     config(config, env) {
       if (env) {
@@ -533,7 +535,8 @@ async function buildPolyfillChunk(
   imports,
   bundle,
   facadeToChunkMap,
-  buildOptions
+  buildOptions,
+  externalSystemJS
 ) {
   let { minify, assetsDir } = buildOptions
   minify = minify ? 'terser' : false
@@ -542,7 +545,7 @@ async function buildPolyfillChunk(
     root: __dirname,
     configFile: false,
     logLevel: 'error',
-    plugins: [polyfillsPlugin(imports)],
+    plugins: [polyfillsPlugin(imports, externalSystemJS)],
     build: {
       write: false,
       target: false,
@@ -559,7 +562,9 @@ async function buildPolyfillChunk(
       }
     }
   })
-  const polyfillChunk = (Array.isArray(res) ? res[0] : res).output[0]
+  const _polyfillChunk = Array.isArray(res) ? res[0] : res
+  if (!('output' in _polyfillChunk)) return
+  const polyfillChunk = _polyfillChunk.output[0]
 
   // associate the polyfill chunk to every entry chunk so that we can retrieve
   // the polyfill filename in index html transform
@@ -580,9 +585,9 @@ const polyfillId = 'vite/legacy-polyfills'
  * @param {Set<string>} imports
  * @return {import('rollup').Plugin}
  */
-function polyfillsPlugin(imports) {
+function polyfillsPlugin(imports, externalSystemJS) {
   return {
-    name: 'polyfills',
+    name: 'vite:legacy-polyfills',
     resolveId(id) {
       if (id === polyfillId) {
         return id
@@ -592,7 +597,7 @@ function polyfillsPlugin(imports) {
       if (id === polyfillId) {
         return (
           [...imports].map((i) => `import "${i}";`).join('') +
-          `import "systemjs/dist/s.min.js";`
+          (externalSystemJS ? '' : `import "systemjs/dist/s.min.js";`)
         )
       }
     }

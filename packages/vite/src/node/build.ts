@@ -113,7 +113,7 @@ export interface BuildOptions {
   /**
    * Set to `false` to disable minification, or specify the minifier to use.
    * Available options are 'terser' or 'esbuild'.
-   * @default 'terser'
+   * @default 'esbuild'
    */
   minify?: boolean | 'terser' | 'esbuild'
   /**
@@ -185,8 +185,14 @@ export interface BuildOptions {
    */
   ssrManifest?: boolean
   /**
+   * Set to false to disable reporting compressed chunk sizes.
+   * Can slightly improve build speed.
+   */
+  reportCompressedSize?: boolean
+  /**
    * Set to false to disable brotli compressed size reporting for build.
    * Can slightly improve build speed.
+   * @deprecated use `build.reportCompressedSize` instead.
    */
   brotliSize?: boolean
   /**
@@ -211,7 +217,11 @@ export interface LibraryOptions {
 export type LibraryFormats = 'es' | 'cjs' | 'umd' | 'iife'
 
 export type ResolvedBuildOptions = Required<
-  Omit<BuildOptions, 'base' | 'cleanCssOptions' | 'polyfillDynamicImport'>
+  Omit<
+    BuildOptions,
+    // make deprecated options optional
+    'base' | 'cleanCssOptions' | 'polyfillDynamicImport' | 'brotliSize'
+  >
 >
 
 export function resolveBuildOptions(raw?: BuildOptions): ResolvedBuildOptions {
@@ -224,6 +234,19 @@ export function resolveBuildOptions(raw?: BuildOptions): ResolvedBuildOptions {
     cssCodeSplit: !raw?.lib,
     sourcemap: false,
     rollupOptions: {},
+    minify: raw?.ssr ? false : 'esbuild',
+    terserOptions: {},
+    write: true,
+    emptyOutDir: null,
+    manifest: false,
+    lib: false,
+    ssr: false,
+    ssrManifest: false,
+    reportCompressedSize: true,
+    // brotliSize: true,
+    chunkSizeWarningLimit: 500,
+    watch: null,
+    ...raw,
     commonjsOptions: {
       include: [/node_modules/],
       extensions: ['.js', '.cjs'],
@@ -233,19 +256,7 @@ export function resolveBuildOptions(raw?: BuildOptions): ResolvedBuildOptions {
       warnOnError: true,
       exclude: [/node_modules/],
       ...raw?.dynamicImportVarsOptions
-    },
-    minify: raw?.ssr ? false : 'terser',
-    terserOptions: {},
-    write: true,
-    emptyOutDir: null,
-    manifest: false,
-    lib: false,
-    ssr: false,
-    ssrManifest: false,
-    brotliSize: true,
-    chunkSizeWarningLimit: 500,
-    watch: null,
-    ...raw
+    }
   }
 
   // handle special build targets
@@ -267,6 +278,10 @@ export function resolveBuildOptions(raw?: BuildOptions): ResolvedBuildOptions {
   // normalize false string into actual false
   if ((resolved.minify as any) === 'false') {
     resolved.minify = false
+  }
+
+  if (resolved.minify === true) {
+    resolved.minify = 'esbuild'
   }
 
   return resolved
@@ -291,9 +306,7 @@ export function resolveBuildPlugins(config: ResolvedConfig): {
     post: [
       buildImportAnalysisPlugin(config),
       buildEsbuildPlugin(config),
-      ...(options.minify && options.minify !== 'esbuild'
-        ? [terserPlugin(options.terserOptions)]
-        : []),
+      ...(options.minify === 'terser' ? [terserPlugin(config)] : []),
       ...(options.manifest ? [manifestPlugin(config)] : []),
       ...(options.ssrManifest ? [ssrManifestPlugin(config)] : []),
       buildReporterPlugin(config),

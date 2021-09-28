@@ -467,7 +467,13 @@ export function tryNodeResolve(
   }
 
   let resolved = deepMatch
-    ? resolveDeepImport(id, pkg, options, targetWeb, preserveSymlinks)
+    ? resolveDeepImport(
+        '.' + id.slice(pkgId.length),
+        pkg,
+        options,
+        targetWeb,
+        preserveSymlinks
+      )
     : resolvePackageEntry(id, pkg, options, targetWeb, preserveSymlinks)
   if (!resolved) {
     return
@@ -501,7 +507,8 @@ export function tryNodeResolve(
       importer?.includes('node_modules') ||
       exclude?.includes(pkgId) ||
       exclude?.includes(id) ||
-      SPECIAL_QUERY_RE.test(resolved)
+      SPECIAL_QUERY_RE.test(resolved) ||
+      ssr
     ) {
       // excluded from optimization
       // Inject a version query to npm deps so that the browser
@@ -804,7 +811,6 @@ function resolveDeepImport(
   targetWeb: boolean,
   preserveSymlinks: boolean
 ): string | undefined {
-  id = '.' + id.slice(data.name.length)
   const cache = getResolvedCache(id, targetWeb)
   if (cache) {
     return cache
