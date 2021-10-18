@@ -58,7 +58,11 @@ export default function viteReact(opts: Options = {}): PluginOption[] {
   const userParserPlugins =
     opts.parserPlugins || opts.babel?.parserOpts?.plugins || []
 
-  const importReactRE = /(^|\n)import\s+(\*\s+as\s+)?React\s+/
+  // Support pattens like:
+  // - import * as React from 'react';
+  // - import React from 'react';
+  // - import React, {useEffect} from 'react';
+  const importReactRE = /(^|\n)import\s+(\*\s+as\s+)?React(,|\s+)/
 
   const viteBabel: Plugin = {
     name: 'vite:react-babel',
@@ -70,7 +74,7 @@ export default function viteReact(opts: Options = {}): PluginOption[] {
         resolve: projectRoot
       })
       isProduction = config.isProduction
-      skipFastRefresh = isProduction || config.command === 'build'
+      skipFastRefresh ||= isProduction || config.command === 'build'
 
       const jsxInject = config.esbuild && config.esbuild.jsxInject
       if (jsxInject && importReactRE.test(jsxInject)) {
@@ -92,12 +96,11 @@ export default function viteReact(opts: Options = {}): PluginOption[] {
       )
     },
     async transform(code, id, ssr) {
-      if (/\.[tj]sx?$/.test(id)) {
+      if (/\.(mjs|[tj]sx?)$/.test(id)) {
         const plugins = [...userPlugins]
 
         const parserPlugins: typeof userParserPlugins = [
           ...userParserPlugins,
-          'jsx',
           'importMeta',
           // This plugin is applied before esbuild transforms the code,
           // so we need to enable some stage 3 syntax that is supported in
@@ -107,6 +110,10 @@ export default function viteReact(opts: Options = {}): PluginOption[] {
           'classPrivateProperties',
           'classPrivateMethods'
         ]
+
+        if (!id.endsWith('.ts')) {
+          parserPlugins.push('jsx')
+        }
 
         const isTypeScript = /\.tsx?$/.test(id)
         if (isTypeScript) {

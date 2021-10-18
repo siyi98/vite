@@ -34,7 +34,9 @@ test('/about', async () => {
 
 test('/external', async () => {
   await page.goto(url + '/external')
-  expect(await page.textContent('div')).toMatch('Example external component content')
+  expect(await page.textContent('div')).toMatch(
+    'Example external component content'
+  )
   // should not have hydration mismatch
   browserLogs.forEach((msg) => {
     expect(msg).not.toMatch('mismatch')
@@ -139,4 +141,9 @@ test('client navigation', async () => {
   await untilUpdated(() => page.textContent('h1'), 'About')
   editFile('src/pages/About.vue', (code) => code.replace('About', 'changed'))
   await untilUpdated(() => page.textContent('h1'), 'changed')
+})
+
+test('import.meta.url', async () => {
+  await page.goto(url)
+  expect(await page.textContent('.protocol')).toEqual('file:')
 })

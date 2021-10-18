@@ -92,6 +92,12 @@ cli
         server: cleanOptions(options)
       })
 
+      if (!server.httpServer) {
+        throw new Error('HTTP server not available')
+      }
+
+      await server.listen()
+
       const info = server.config.logger.info
 
       info(
@@ -102,13 +108,7 @@ cli
         }
       )
 
-      if (!server.httpServer) {
-        throw new Error('HTTP server not available')
-      }
-
-      await server.listen()
-
-      printHttpServerUrls(server.httpServer, server.config, options)
+      server.printUrls()
 
       // @ts-ignore
       if (global.__vite_start_time) {
@@ -149,7 +149,7 @@ cli
   .option(
     '--minify [minifier]',
     `[boolean | "terser" | "esbuild"] enable/disable minification, ` +
-      `or specify minifier to use (default: terser)`
+      `or specify minifier to use (default: esbuild)`
   )
   .option('--manifest', `[boolean] emit build manifest json`)
   .option('--ssrManifest', `[boolean] emit ssr manifest json`)
@@ -249,7 +249,7 @@ cli
         )
         const server = await preview(config, cleanOptions(options))
 
-        printHttpServerUrls(server, config, options)
+        printHttpServerUrls(server, config)
       } catch (e) {
         createLogger(options.logLevel).error(
           chalk.red(`error when starting preview server:\n${e.stack}`),

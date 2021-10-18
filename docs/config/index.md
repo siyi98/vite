@@ -378,6 +378,7 @@ export default defineConfig(async ({ command, mode }) => {
 ### server.port
 
 - **Type:** `number`
+- **Default:** `3000`
 
   Specify server port. Note if the port is already being used, Vite will automatically try the next available port so this may not be the actual port the server ends up listening on.
 
@@ -475,7 +476,7 @@ export default defineConfig(async ({ command, mode }) => {
 
   `clientPort` is an advanced option that overrides the port only on the client side, allowing you to serve the websocket on a different port than the client code looks for it on. Useful if you're using an SSL proxy in front of your dev server.
 
-  When using `server.middlewareMode` and `server.https`, setting `server.hmr.server` to your HTTPS server will process HMR secure connection requests through your server. This can be helpful when using self-signed certificates.
+  When using `server.middlewareMode` or `server.https`, assigning `server.hmr.server` to your HTTP(S) server will process HMR connection requests through your server. This can be helpful when using self-signed certificates or when you want to expose Vite over a network on a single port.
 
 ### server.watch
 
@@ -484,6 +485,23 @@ export default defineConfig(async ({ command, mode }) => {
   File system watcher options to pass on to [chokidar](https://github.com/paulmillr/chokidar#api).
 
   When running Vite on Windows Subsystem for Linux (WSL) 2, if the project folder resides in a Windows filesystem, you'll need to set this option to `{ usePolling: true }`. This is due to [a WSL2 limitation](https://github.com/microsoft/WSL/issues/4739) with the Windows filesystem.
+
+  The Vite server watcher skips `.git/` and `node_modules/` directories by default. If you want to watch a package inside `node_modules/`, you can pass a negated glob pattern to `server.watch.ignored`. That is:
+
+  ```js
+  export default defineConfig({
+    server: {
+      watch: {
+        ignored: ['!**/node_modules/your-package-name/**']
+      }
+    },
+    // The watched package must be excluded from optimization,
+    // so that it can appear in the dependency graph and trigger hot reload.
+    optimizeDeps: {
+      exclude: ['your-package-name']
+    }
+  })
+  ```
 
 ### server.middlewareMode
 
@@ -601,7 +619,7 @@ export default defineConfig({
 
   Another special value is `'esnext'` - which assumes native dynamic imports support and will transpile as little as possible:
 
-  - If the [`build.minify`](#build-minify) option is `'terser'` (the default), `'esnext'` will be forced down to `'es2019'`.
+  - If the [`build.minify`](#build-minify) option is `'terser'`, `'esnext'` will be forced down to `'es2019'`.
   - In other cases, it will perform no transpilation at all.
 
   The transform is performed with esbuild and the value should be a valid [esbuild target option](https://esbuild.github.io/api/#target). Custom targets can either be a ES version (e.g. `es2015`), a browser with version (e.g. `chrome58`), or an array of multiple target strings.
@@ -657,6 +675,17 @@ export default defineConfig({
 
   If disabled, all CSS in the entire project will be extracted into a single CSS file.
 
+### build.cssTarget
+
+- **Type:** `string | string[]`
+- **Default:** the same as [`build.target`](/config/#build-target)
+
+  This options allows users to set a different browser target for CSS minification from the one used for JavaScript transpilation.
+
+  It should only be used when you are targeting a non-mainstream browser.
+  One example is Android WeChat WebView, which supports most modern JavaScript features but not the [`#RGBA` hexadecimal color notation in CSS](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#rgb_colors).
+  In this case, you need to set `build.cssTarget` to `chrome61` to prevent vite from transform `rgba()` colors into `#RGBA` hexadecimal notations.
+
 ### build.sourcemap
 
 - **Type:** `boolean | 'inline' | 'hidden'`
@@ -708,9 +737,9 @@ export default defineConfig({
 ### build.minify
 
 - **Type:** `boolean | 'terser' | 'esbuild'`
-- **Default:** `'terser'`
+- **Default:** `'esbuild'`
 
-  Set to `false` to disable minification, or specify the minifier to use. The default is [Terser](https://github.com/terser/terser) which is slower but produces smaller bundles in most cases. Esbuild minification is significantly faster but will result in slightly larger bundles.
+  Set to `false` to disable minification, or specify the minifier to use. The default is [Esbuild](https://github.com/evanw/esbuild) which is 20 ~ 40x faster than terser and only 1 ~ 2% worse compression. [Benchmarks](https://github.com/privatenumber/minification-benchmarks)
 
 ### build.terserOptions
 
@@ -730,7 +759,7 @@ export default defineConfig({
 - **Type:** `boolean`
 - **Default:** `true` if `outDir` is inside `root`
 
-  By default, Vite will empty the `outDir` on build if it is inside project root. It will emit a warning if `outDir` is outside of root to avoid accidentially removing important files. You can explicitly set this option to suppress the warning. This is also available via command line as `--emptyOutDir`.
+  By default, Vite will empty the `outDir` on build if it is inside project root. It will emit a warning if `outDir` is outside of root to avoid accidentally removing important files. You can explicitly set this option to suppress the warning. This is also available via command line as `--emptyOutDir`.
 
 ### build.brotliSize
 

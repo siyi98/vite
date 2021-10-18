@@ -17,7 +17,7 @@ import { resolveHostname } from './utils'
 
 /**
  * Starts the Vite server in preview mode, to simulate a production deployment
- * @param config - the resolve Vite config
+ * @param config - the resolved Vite config
  * @param serverOptions - what host and port to use
  * @experimental
  */
@@ -72,7 +72,9 @@ export async function preview(
   if (options.open) {
     const path = typeof options.open === 'string' ? options.open : base
     openBrowser(
-      path.startsWith('http') ? path : `${protocol}://${hostname.name}:${serverPort}${path}`,
+      path.startsWith('http')
+        ? path
+        : `${protocol}://${hostname.name}:${serverPort}${path}`,
       true,
       logger
     )
